@@ -223,6 +223,7 @@
       </button>
       <div class="status s-idle" id="status"><span class="dot"></span><span id="status-text">Připraveno</span></div>
       <div id="lvl" style="display:none;width:160px;height:7px;background:var(--line);border-radius:5px;overflow:hidden"><div id="lvl-bar" style="height:100%;width:0;background:var(--ok);transition:width .08s"></div></div>
+      <div id="audiodiag" style="display:none;font-size:11px;color:var(--muted-2);margin-top:2px"></div>
     </div>
 
     <div class="tr-head">
@@ -315,13 +316,17 @@ AudioPlayer.prototype.init=async function(){
   this.ready=true;
 };
 AudioPlayer.prototype.play=async function(b64){
-  if(!this.ready)await this.init();
-  if(this.ctx.state==='suspended')await this.ctx.resume();
-  var bin=atob(b64), n=bin.length, bytes=new Uint8Array(n);
-  for(var k=0;k<n;k++) bytes[k]=bin.charCodeAt(k);
-  var i16=new Int16Array(bytes.buffer), f=new Float32Array(i16.length);
-  for(var j=0;j<i16.length;j++) f[j]=i16[j]/32768;
-  this.node.port.postMessage(f);
+  try{
+    if(!this.ready)await this.init();
+    if(this.ctx.state==='suspended')await this.ctx.resume();
+    var bin=atob(b64), n=bin.length; n-=(n%2);
+    var bytes=new Uint8Array(n);
+    for(var k=0;k<n;k++) bytes[k]=bin.charCodeAt(k);
+    var i16=new Int16Array(bytes.buffer), f=new Float32Array(i16.length);
+    for(var j=0;j<i16.length;j++) f[j]=i16[j]/32768;
+    this.node.port.postMessage(f);
+    window.__audioPlayed=(window.__audioPlayed||0)+1; if(window.__updAudioDiag)window.__updAudioDiag();
+  }catch(e){ window.__audioErr=e.message; console.error('play error',e); if(window.__updAudioDiag)window.__updAudioDiag(); }
 };
 AudioPlayer.prototype.interrupt=function(){ if(this.node)this.node.port.postMessage('interrupt'); };
 AudioPlayer.prototype.destroy=function(){ try{if(this.ctx)this.ctx.close();}catch(e){} this.ready=false; };
@@ -350,8 +355,8 @@ LiveSession.prototype.handle=function(d){
   if(sc.inputTranscription && this.primary) pushTranscript('in', sc.inputTranscription.text||'', sc.inputTranscription.languageCode||'', sc.inputTranscription.finished);
   if(sc.outputTranscription) pushTranscript('out', sc.outputTranscription.text||'', sc.outputTranscription.languageCode||this.target, sc.outputTranscription.finished);
   var parts=sc.modelTurn&&sc.modelTurn.parts;
-  if(parts) for(var i=0;i<parts.length;i++){ if(parts[i].inlineData&&parts[i].inlineData.data) this.player.play(parts[i].inlineData.data); }
-  if(sc.interrupted) this.player.interrupt();
+  if(parts) for(var i=0;i<parts.length;i++){ if(parts[i].inlineData&&parts[i].inlineData.data){ window.__audioRecv=(window.__audioRecv||0)+1; this.player.play(parts[i].inlineData.data); if(window.__updAudioDiag)window.__updAudioDiag(); } }
+  // pri prubeznem prekladu frontu nemazeme, at se prelozeny zvuk stihne prehrat
 };
 LiveSession.prototype.sendAudio=function(b64){ if(this.ws&&this.ws.readyState===1) this.ws.send(JSON.stringify({realtimeInput:{audio:{data:b64,mimeType:'audio/pcm;rate=16000'}}})); };
 LiveSession.prototype.close=function(){ try{if(this.ws)this.ws.close();}catch(e){} this.player.destroy(); };
@@ -389,10 +394,11 @@ function setStatus(state){
   var T=window.__T||{};
   tx.textContent=({idle:T.stReady,connecting:T.stConnecting,listening:(mode==='call'?(T.callListening||T.stListening):T.stListening),error:T.stError,stopping:T.stStopping})[state]||state;
 }
-function updateMic(){ var b=document.getElementById('micBtn'); b.classList.toggle('live',running); var l=document.getElementById('lvl'); if(l){ l.style.display=running?'block':'none'; if(!running){ var bar=document.getElementById('lvl-bar'); if(bar)bar.style.width='0'; } } }
+function updateMic(){ var b=document.getElementById('micBtn'); b.classList.toggle('live',running); var l=document.getElementById('lvl'); if(l){ l.style.display=running?'block':'none'; if(!running){ var bar=document.getElementById('lvl-bar'); if(bar)bar.style.width='0'; } } var ad=document.getElementById('audiodiag'); if(ad){ ad.style.display=running?'block':'none'; if(!running)ad.textContent=''; } }
 window.__onLevel=function(p){ var bar=document.getElementById('lvl-bar'); if(bar)bar.style.width=Math.min(100,Math.round(p*220))+'%'; };
+window.__updAudioDiag=function(){ var d=document.getElementById('audiodiag'); if(d){ var r=window.__audioRecv||0,p=window.__audioPlayed||0; d.textContent='\uD83D\uDD0A audio '+p+'/'+r+(window.__audioErr?(' \u00b7 chyba: '+window.__audioErr):''); } };
 async function startTranslate(){
-  if(running||busy)return; busy=true;
+  if(running||busy)return; busy=true; window.__audioRecv=0; window.__audioPlayed=0; window.__audioErr='';
   var echo=document.getElementById('echo').checked;
   var callStream=null;
   sessions=[];
