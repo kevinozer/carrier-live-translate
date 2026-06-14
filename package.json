@@ -1,0 +1,15 @@
+{
+  "name": "carrier-live-translate",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Carrier — živý překladač řeči (Gemini 3.5 Live Translate, 70+ jazyků). Cloud Run service.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "@google/genai": "^2.8.0"
+  }
+}
