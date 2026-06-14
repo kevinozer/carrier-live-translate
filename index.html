@@ -104,17 +104,38 @@
   @media(max-width:760px){.cg-aside{display:none}}
   /* ===== welcome ===== */
   #lt-welcome{position:fixed;inset:0;z-index:9000;background:var(--bg);overflow-y:auto}
-  .wl-hero{background:linear-gradient(135deg,#002855,#005EB8);color:#fff;padding:54px 22px 46px;text-align:center;position:relative}
-  .wl-langs{position:absolute;top:18px;right:20px;display:flex;gap:4px}
-  .wl-hero img{height:38px;margin-bottom:18px}
-  .wl-hero h1{font-family:'IBM Plex Sans',sans-serif;font-size:clamp(1.8rem,3vw,2.5rem);margin:0 0 12px;letter-spacing:-.025em}
-  .wl-hero p{max-width:600px;margin:0 auto;color:rgba(255,255,255,.86);font-size:1.05rem;line-height:1.6}
-  .wl-body{max-width:820px;margin:-26px auto 0;padding:0 22px 50px}
-  .wl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:26px}
-  .wl-c{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
-  .wl-c h3{margin:0 0 6px;font-size:1rem;font-family:'IBM Plex Sans',sans-serif}
-  .wl-c p{margin:0;color:var(--muted);font-size:.9rem;line-height:1.55}
-  .wl-open{display:block;width:100%;max-width:320px;margin:0 auto;padding:14px;border:0;border-radius:12px;background:linear-gradient(180deg,#0a6fce,#005EB8);color:#fff;font-weight:600;font-size:1.05rem;box-shadow:0 8px 24px rgba(0,94,184,.3)}
+  .wl-hero{position:relative;background:radial-gradient(1000px 500px at 100% -20%,rgba(42,138,255,.5),transparent 60%),linear-gradient(135deg,#002855 0%,#003D7A 45%,#005EB8 100%);color:#fff;padding:54px 32px 46px}
+  .wl-hero-inner{max-width:1000px;margin:0 auto}
+  .wl-brand{display:flex;align-items:center;gap:11px;margin-bottom:26px}
+  .wl-brand img{height:30px}
+  .wl-brand span{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:.98rem;color:rgba(255,255,255,.92)}
+  .wl-hero h1{font-family:'IBM Plex Sans',sans-serif;font-weight:700;font-size:clamp(2rem,4vw,2.9rem);letter-spacing:-.02em;margin:0}
+  .wl-hero p{font-size:1.05rem;color:rgba(255,255,255,.85);margin:12px 0 24px;max-width:620px;line-height:1.55}
+  .wl-langs{position:absolute;top:22px;right:32px;display:flex;gap:4px}
+  .wl-hero .app-lang{color:#fff;border:1px solid rgba(255,255,255,.45);background:transparent}
+  .wl-hero .app-lang:hover{border-color:#fff;color:#fff}
+  .wl-hero .app-lang-active{background:#fff;color:var(--blue-dark);border-color:#fff}
+  .wl-open-btn{background:#fff;color:var(--blue-dark);font-weight:600;font-size:.95rem;padding:12px 22px;border-radius:10px;cursor:pointer;box-shadow:0 8px 24px -4px rgba(0,30,60,.25);border:none;font-family:inherit}
+  .wl-open-btn:hover{transform:translateY(-1px)}
+  .wl-open-btn-blue{background:var(--blue);color:#fff;align-self:flex-start}
+  .wl-body{max-width:1000px;margin:0 auto;padding:26px 32px 60px;display:flex;flex-direction:column;gap:18px}
+  .wl-card{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:24px}
+  .wl-card h3{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:1.05rem;color:var(--blue-dark);margin:0 0 12px}
+  .wl-card>p{color:var(--ink);font-size:.95rem;line-height:1.6;margin:0;opacity:.85}
+  .wl-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:820px){.wl-grid{grid-template-columns:1fr}}
+  .wl-howto{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px}
+  .wl-howto li{display:flex;gap:12px;align-items:flex-start}
+  .wl-howto .n{flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:.76rem;font-weight:700;display:grid;place-items:center}
+  .wl-howto b{display:block;color:var(--ink);font-size:.9rem}
+  .wl-howto .htxt span{color:var(--muted);font-size:.85rem;line-height:1.5}
+  .wl-tips{margin:0;padding-left:18px;color:var(--ink);opacity:.85;font-size:.9rem;line-height:1.75}
+  .wl-example{display:flex;align-items:stretch;gap:14px}
+  @media(max-width:600px){.wl-example{flex-direction:column}}
+  .wl-io{flex:1;background:var(--bg);border-radius:10px;padding:14px}
+  .wl-io-label{font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+  .wl-io .t{font-size:.88rem;color:var(--ink);opacity:.85;line-height:1.5}
+  .wl-arrow{display:flex;align-items:center;color:var(--muted);font-size:1.4rem}
 </style>
 </head>
 <body>
@@ -149,22 +170,42 @@
 <!-- ============ WELCOME ============ -->
 <div id="lt-welcome">
   <div class="wl-hero">
-    <div class="wl-langs">
+    <div class="wl-langs app-langs">
       <button type="button" class="app-lang" data-al="en" onclick="setAppLang('en')">EN</button>
       <button type="button" class="app-lang" data-al="cs" onclick="setAppLang('cs')">CS</button>
       <button type="button" class="app-lang" data-al="sk" onclick="setAppLang('sk')">SK</button>
     </div>
-    <img src="https://carriercz.netlify.app/carrier-logo.webp" alt="Carrier">
-    <h1 id="wl-h">Živý překladač řeči</h1>
-    <p id="wl-sub">Mluvte přirozeně a slyšte překlad během okamžiku. Řeč na řeč, 70+ jazyků, s živým přepisem.</p>
+    <div class="wl-hero-inner">
+      <div class="wl-brand"><img src="https://carriercz.netlify.app/carrier-logo.webp" alt="Carrier"><span>Carrier AI Hub</span></div>
+      <h1 id="wl-h">Živý překladač řeči</h1>
+      <p id="wl-sub"></p>
+      <button class="wl-open-btn" type="button" onclick="ltOpenApp()">↳ <span id="wl-open-1"></span></button>
+    </div>
   </div>
   <div class="wl-body">
-    <div class="wl-grid">
-      <div class="wl-c"><h3 id="wl-c1h">Jednosměrný režim</h3><p id="wl-c1p">Vyberte cílový jazyk, zapněte mikrofon a mluvte. Okamžitě slyšíte překlad a vidíte přepis.</p></div>
-      <div class="wl-c"><h3 id="wl-c2h">Obousměrná konverzace</h3><p id="wl-c2p">Dva jazyky, automatický překlad oběma směry — ideální pro rozhovor se zahraničním zákazníkem.</p></div>
-      <div class="wl-c"><h3 id="wl-c3h">Soukromí</h3><p id="wl-c3p">Audio teče přímo mezi prohlížečem a Googlem přes krátkodobý token. Firemní klíč zůstává na serveru.</p></div>
+    <div class="wl-card">
+      <h3 id="wl-overview-h"></h3>
+      <p id="wl-overview"></p>
     </div>
-    <button class="wl-open" id="wl-open" onclick="ltOpenApp()">Otevřít aplikaci</button>
+    <div class="wl-grid">
+      <div class="wl-card">
+        <h3 id="wl-howto-h"></h3>
+        <ol class="wl-howto" id="wl-howto"></ol>
+      </div>
+      <div class="wl-card">
+        <h3 id="wl-tips-h"></h3>
+        <ul class="wl-tips" id="wl-tips"></ul>
+      </div>
+    </div>
+    <div class="wl-card">
+      <h3 id="wl-example-h"></h3>
+      <div class="wl-example">
+        <div class="wl-io"><div class="wl-io-label" id="wl-in-label"></div><div class="t" id="wl-input"></div></div>
+        <div class="wl-arrow">→</div>
+        <div class="wl-io"><div class="wl-io-label" id="wl-out-label"></div><div class="t" id="wl-output"></div></div>
+      </div>
+    </div>
+    <button class="wl-open-btn wl-open-btn-blue" type="button" onclick="ltOpenApp()"><span id="wl-open-2"></span> →</button>
   </div>
 </div>
 
@@ -482,6 +523,10 @@ var UI={
     c1h:'One-way mode',c1p:'Pick a target language, turn on the mic and speak. You instantly hear the translation and see the transcript.',
     c2h:'Two-way conversation',c2p:'Two languages, automatic translation both ways — ideal for talking with a foreign customer.',
     c3h:'Privacy',c3p:'Audio streams directly between your browser and Google via a short-lived token. The company key stays on the server.',
+    ovh:'What it does',ov:'Speak into the microphone (or into a call) and the app translates your speech into the target language in real time — you hear it out loud and see a live transcript. Speech to speech via Gemini Live, 70+ languages, one-way or both ways.',
+    hh:'How it works',how:[['Pick a mode','One-way translation, two-way conversation, or call translation (Teams).'],['Set the language','Choose the target language (and a second language for conversations).'],['Start the microphone','Allow the mic or share the call audio and start speaking.'],['Listen and read','You hear the translation out loud and see the live transcript.']],
+    th:'Tips',tips:['For call translation use headphones — only the other party is captured.','The source language is detected automatically.','Two-way mode is ideal for talking with a foreign customer.'],
+    exh:'Example',inl:'INPUT (you speak)',inp:'“Bonjour, je voudrais commander…” — spoken in French into the mic.',outl:'OUTPUT (you hear)',outp:'“Hello, I would like to order…” — out loud in your language and in the transcript.',
     open:'Open application',title:'Live speech translator',lead:'Speak and hear the translation in real time. Speech to speech, 70+ languages.',
     modeOne:'One-way',modeTwo:'Two-way',owLbl:'Hear the translation in',owNote:'The source language is detected automatically.',
     twA:'Language 1',twB:'Language 2',twNote:'Speak either of the two languages — the translation always goes to the other one.',
@@ -492,6 +537,10 @@ var UI={
     c1h:'Jednosměrný režim',c1p:'Vyberte cílový jazyk, zapněte mikrofon a mluvte. Okamžitě slyšíte překlad a vidíte přepis.',
     c2h:'Obousměrná konverzace',c2p:'Dva jazyky, automatický překlad oběma směry — ideální pro rozhovor se zahraničním zákazníkem.',
     c3h:'Soukromí',c3p:'Audio teče přímo mezi prohlížečem a Googlem přes krátkodobý token. Firemní klíč zůstává na serveru.',
+    ovh:'Co to umí',ov:'Mluvíte do mikrofonu (nebo do hovoru) a aplikace překládá vaši řeč do cílového jazyka v reálném čase — uslyšíte ji nahlas a uvidíte živý přepis. Řeč na řeč přes Gemini Live, 70+ jazyků, jedním nebo oběma směry.',
+    hh:'Jak to funguje',how:[['Vyberte režim','Jednosměrný překlad, obousměrná konverzace, nebo překlad hovoru (Teams).'],['Nastavte jazyk','Zvolte cílový jazyk (a u konverzace i druhý jazyk).'],['Spusťte mikrofon','Povolte mikrofon nebo sdílení zvuku hovoru a začněte mluvit.'],['Poslouchejte a čtěte','Překlad slyšíte nahlas a zároveň vidíte živý přepis.']],
+    th:'Tipy',tips:['Pro překlad hovoru použijte sluchátka — zachytí se jen protistrana.','Zdrojový jazyk se rozpozná automaticky.','Obousměrný režim je ideální pro rozhovor se zahraničním zákazníkem.'],
+    exh:'Příklad',inl:'VSTUP (mluvíte)',inp:'„Bonjour, je voudrais commander…“ — francouzsky do mikrofonu.',outl:'VÝSTUP (slyšíte)',outp:'„Dobrý den, chtěl bych objednat…“ — česky, nahlas a v přepisu.',
     open:'Otevřít aplikaci',title:'Živý překladač řeči',lead:'Mluvte a slyšte překlad v reálném čase. Řeč na řeč, 70+ jazyků.',
     modeOne:'Jednosměrný',modeTwo:'Obousměrný',owLbl:'Slyšet překlad v jazyce',owNote:'Zdrojový jazyk se rozpozná automaticky.',
     twA:'Jazyk 1',twB:'Jazyk 2',twNote:'Mluvte libovolným z těchto dvou jazyků — překlad jde vždy do toho druhého.',
@@ -502,6 +551,10 @@ var UI={
     c1h:'Jednosmerný režim',c1p:'Vyberte cieľový jazyk, zapnite mikrofón a hovorte. Okamžite počujete preklad a vidíte prepis.',
     c2h:'Obojsmerná konverzácia',c2p:'Dva jazyky, automatický preklad oboma smermi — ideálne pre rozhovor so zahraničným zákazníkom.',
     c3h:'Súkromie',c3p:'Audio tečie priamo medzi prehliadačom a Googlom cez krátkodobý token. Firemný kľúč zostáva na serveri.',
+    ovh:'Čo to vie',ov:'Hovoríte do mikrofónu (alebo do hovoru) a aplikácia prekladá vašu reč do cieľového jazyka v reálnom čase — počujete ju nahlas a vidíte živý prepis. Reč na reč cez Gemini Live, 70+ jazykov, jedným alebo oboma smermi.',
+    hh:'Ako to funguje',how:[['Vyberte režim','Jednosmerný preklad, obojsmerná konverzácia, alebo preklad hovoru (Teams).'],['Nastavte jazyk','Zvoľte cieľový jazyk (a pri konverzácii aj druhý jazyk).'],['Spustite mikrofón','Povoľte mikrofón alebo zdieľanie zvuku hovoru a začnite hovoriť.'],['Počúvajte a čítajte','Preklad počujete nahlas a zároveň vidíte živý prepis.']],
+    th:'Tipy',tips:['Pre preklad hovoru použite slúchadlá — zachytí sa len druhá strana.','Zdrojový jazyk sa rozpozná automaticky.','Obojsmerný režim je ideálny pre rozhovor so zahraničným zákazníkom.'],
+    exh:'Príklad',inl:'VSTUP (hovoríte)',inp:'„Bonjour, je voudrais commander…“ — po francúzsky do mikrofónu.',outl:'VÝSTUP (počujete)',outp:'„Dobrý deň, chcel by som objednať…“ — po slovensky, nahlas a v prepise.',
     open:'Otvoriť aplikáciu',title:'Živý prekladač reči',lead:'Hovorte a počúvajte preklad v reálnom čase. Reč na reč, 70+ jazykov.',
     modeOne:'Jednosmerný',modeTwo:'Obojsmerný',owLbl:'Počuť preklad v jazyku',owNote:'Zdrojový jazyk sa rozpozná automaticky.',
     twA:'Jazyk 1',twB:'Jazyk 2',twNote:'Hovorte ktorýmkoľvek z týchto dvoch jazykov — preklad ide vždy do toho druhého.',
@@ -521,7 +574,11 @@ function setAppLang(l){
   window.__lang=l; var t=UI[l]||UI.cs; window.__T=t;
   cgSetLang(l);
   _set('mnav-back-text',t.back);_set('nav-sub',t.navSub);
-  _set('wl-h',t.wlH);_set('wl-sub',t.wlSub);_set('wl-c1h',t.c1h);_set('wl-c1p',t.c1p);_set('wl-c2h',t.c2h);_set('wl-c2p',t.c2p);_set('wl-c3h',t.c3h);_set('wl-c3p',t.c3p);_set('wl-open',t.open);
+  _set('wl-h',t.wlH);_set('wl-sub',t.wlSub);_set('wl-open-1',t.open);_set('wl-open-2',t.open);
+  _set('wl-overview-h',t.ovh);_set('wl-overview',t.ov);_set('wl-howto-h',t.hh);_set('wl-tips-h',t.th);
+  _set('wl-example-h',t.exh);_set('wl-in-label',t.inl);_set('wl-out-label',t.outl);_set('wl-input',t.inp);_set('wl-output',t.outp);
+  var ol=document.getElementById('wl-howto');if(ol){ol.innerHTML='';for(var hi=0;hi<t.how.length;hi++){var li=document.createElement('li');li.innerHTML='<span class="n">'+(hi+1)+'</span><div class="htxt"><b>'+t.how[hi][0]+'</b><span>'+t.how[hi][1]+'</span></div>';ol.appendChild(li);}}
+  var ul=document.getElementById('wl-tips');if(ul){ul.innerHTML='';for(var ti=0;ti<t.tips.length;ti++){var liT=document.createElement('li');liT.textContent=t.tips[ti];ul.appendChild(liT);}}
   _set('t-title',t.title);_set('t-lead',t.lead);_set('mode-one',t.modeOne);_set('mode-two',t.modeTwo);_set('mode-call',t.modeCall);_set('cm-lbl',t.cmLbl);_set('cm-note',t.cmNote);_set('cm-info',t.cmInfo);
   _set('ow-lbl',t.owLbl);_set('ow-note',t.owNote);_set('tw-a-lbl',t.twA);_set('tw-b-lbl',t.twB);_set('tw-note',t.twNote);
   _set('echo-lbl',t.echo);_set('tr-h',t.trH);_set('tr-clear',t.trClear);
