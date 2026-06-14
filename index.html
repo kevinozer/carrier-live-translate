@@ -337,7 +337,7 @@ LiveSession.prototype.connect=async function(){
     var settled=false;
     self.ws=new WebSocket(WS_BASE+encodeURIComponent(data.token));
     self.ws.onopen=function(){
-      self.ws.send(JSON.stringify({setup:{model:'models/'+MODEL,generationConfig:{responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{},translationConfig:{targetLanguageCode:self.target,echoTargetLanguage:self.echo}}}}));
+      self.ws.send(JSON.stringify({setup:{model:'models/'+MODEL,generationConfig:{responseModalities:['AUDIO'],translationConfig:{targetLanguageCode:self.target,echoTargetLanguage:self.echo}},inputAudioTranscription:{},outputAudioTranscription:{}}}));
       if(!settled){settled=true;resolve();}
     };
     self.ws.onmessage=async function(ev){ var d=ev.data instanceof Blob?await ev.data.text():ev.data; try{ self.handle(JSON.parse(d)); }catch(e){} };
