@@ -325,7 +325,9 @@ AudioPlayer.prototype.play=async function(b64){
     var ch=buf.getChannelData(0);
     for(var j=0;j<len;j++) ch[j]=i16[j]/32768;
     var srcNode=this.ctx.createBufferSource(); srcNode.buffer=buf; srcNode.connect(this.gain);
-    var startAt=Math.max(this.ctx.currentTime+0.03, this.nextTime);
+    var lead=0.2, startAt;
+    if(this.nextTime < this.ctx.currentTime+0.05){ startAt=this.ctx.currentTime+lead; }
+    else { startAt=this.nextTime; }
     srcNode.start(startAt); this.nextTime=startAt+buf.duration;
     window.__audioPlayed=(window.__audioPlayed||0)+1; if(window.__updAudioDiag)window.__updAudioDiag();
   }catch(e){ window.__audioErr=e.message; console.error('play error',e); if(window.__updAudioDiag)window.__updAudioDiag(); }
