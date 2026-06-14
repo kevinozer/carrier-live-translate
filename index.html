@@ -184,9 +184,10 @@
     <h1 class="app-title" id="t-title">Živý překladač řeči</h1>
     <p class="app-lead" id="t-lead">Mluvte a slyšte překlad v reálném čase. Řeč na řeč, 70+ jazyků.</p>
 
-    <div class="modeToggle" id="modeToggle">
+    <div class="modeToggle" id="modeToggle" style="max-width:500px">
       <button type="button" class="modeBtn modeBtn-active" id="mode-one">Jednosměrný</button>
       <button type="button" class="modeBtn" id="mode-two">Obousměrný</button>
+      <button type="button" class="modeBtn" id="mode-call">Překlad hovoru</button>
     </div>
 
     <!-- one-way -->
@@ -204,6 +205,14 @@
         <div><label class="fld" id="tw-b-lbl" for="tw-b">Jazyk 2</label><select id="tw-b"></select></div>
       </div>
       <p class="note" id="tw-note">Mluvte libovolným z těchto dvou jazyků — překlad jde vždy do toho druhého.</p>
+    </div>
+
+    <!-- call -->
+    <div id="cm" class="hidden">
+      <label class="fld" id="cm-lbl" for="cm-tgt">Slyšet a číst překlad v jazyce</label>
+      <select id="cm-tgt"></select>
+      <p class="note" id="cm-note">Zdrojový jazyk se rozpozná automaticky.</p>
+      <div class="note" id="cm-info" style="background:var(--tint);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px;line-height:1.5;color:var(--muted)">Po startu sdílejte okno/obrazovku s hovorem (Teams) a zaškrtněte „Sdílet zvuk". Použijte sluchátka, ať se zachytí jen protistrana. Na macOS je dostupný jen zvuk z karty prohlížeče (Teams ve webu).</div>
     </div>
 
     <label class="adv"><input type="checkbox" id="echo"><span id="echo-lbl">Opakovat i řeč, která už je v cílovém jazyce</span></label>
@@ -265,8 +274,8 @@ var playbackWorkletUrl = URL.createObjectURL(new Blob([
 
 // ===== zachytávání mikrofonu (16 kHz PCM16), sdílené mezi session =====
 function AudioCapture(onChunk){ this.onChunk=onChunk; this.ctx=null; this.node=null; this.stream=null; this.on=false; }
-AudioCapture.prototype.start=async function(){
-  this.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+AudioCapture.prototype.start=async function(providedStream){
+  this.stream=providedStream||await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
   this.ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});
   await this.ctx.audioWorklet.addModule(captureWorkletUrl);
   this.node=new AudioWorkletNode(this.ctx,'audio-capture-processor');
@@ -373,30 +382,40 @@ function setStatus(state){
   var el=document.getElementById('status'), tx=document.getElementById('status-text');
   el.className='status s-'+state;
   var T=window.__T||{};
-  tx.textContent=({idle:T.stReady,connecting:T.stConnecting,listening:T.stListening,error:T.stError,stopping:T.stStopping})[state]||state;
+  tx.textContent=({idle:T.stReady,connecting:T.stConnecting,listening:(mode==='call'?(T.callListening||T.stListening):T.stListening),error:T.stError,stopping:T.stStopping})[state]||state;
 }
 function updateMic(){ var b=document.getElementById('micBtn'); b.classList.toggle('live',running); }
 async function startTranslate(){
   if(running||busy)return; busy=true;
   var echo=document.getElementById('echo').checked;
+  var callStream=null;
   sessions=[];
   if(mode==='one'){
     var tgt=document.getElementById('ow-tgt').value;
     sessions.push(new LiveSession({target:tgt,echo:echo,primary:true}));
+  } else if(mode==='call'){
+    var ctgt=document.getElementById('cm-tgt').value;
+    try{
+      callStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+    }catch(e){ busy=false; setStatus('idle'); toast(window.__T.shareCancel,true); return; }
+    if(!callStream.getAudioTracks().length){ callStream.getTracks().forEach(function(t){t.stop();}); busy=false; setStatus('idle'); toast(window.__T.noAudio,true); return; }
+    callStream.getVideoTracks().forEach(function(t){t.stop();});
+    callStream.getAudioTracks()[0].onended=function(){ if(running) stopTranslate(); };
+    sessions.push(new LiveSession({target:ctgt,echo:false,primary:true}));
   } else {
     var a=document.getElementById('tw-a').value, b=document.getElementById('tw-b').value;
     if(a===b){ toast(window.__T.sameLang,true); busy=false; return; }
-    sessions.push(new LiveSession({target:b,echo:echo,primary:true}));   // mluví A → překlad do B
-    sessions.push(new LiveSession({target:a,echo:echo,primary:false}));  // mluví B → překlad do A
+    sessions.push(new LiveSession({target:b,echo:echo,primary:true}));
+    sessions.push(new LiveSession({target:a,echo:echo,primary:false}));
   }
   setStatus('connecting');
   try{
     await Promise.all(sessions.map(function(s){return s.connect();}));
-  }catch(e){ setStatus('error'); toast(window.__T.connFail+' '+e.message,true); cleanup(); busy=false; return; }
+  }catch(e){ setStatus('error'); toast(window.__T.connFail+' '+e.message,true); if(callStream)callStream.getTracks().forEach(function(t){t.stop();}); cleanup(); busy=false; return; }
   try{
     capture=new AudioCapture(function(b64){ for(var i=0;i<sessions.length;i++) sessions[i].sendAudio(b64); });
-    await capture.start();
-  }catch(e){ setStatus('error'); toast(window.__T.micFail+' '+e.message,true); cleanup(); busy=false; return; }
+    await capture.start(callStream);
+  }catch(e){ setStatus('error'); toast(window.__T.micFail+' '+e.message,true); if(callStream)callStream.getTracks().forEach(function(t){t.stop();}); cleanup(); busy=false; return; }
   running=true; busy=false; setStatus('listening'); updateMic();
 }
 function stopTranslate(){
@@ -414,11 +433,15 @@ function toggleMic(){ if(running) stopTranslate(); else startTranslate(); }
 
 // ===== UI eventy =====
 function setMode(m){
+  if(running) return;
   mode=m;
   document.getElementById('mode-one').className='modeBtn'+(m==='one'?' modeBtn-active':'');
   document.getElementById('mode-two').className='modeBtn'+(m==='two'?' modeBtn-active':'');
+  document.getElementById('mode-call').className='modeBtn'+(m==='call'?' modeBtn-active':'');
   document.getElementById('ow').classList.toggle('hidden',m!=='one');
   document.getElementById('tw').classList.toggle('hidden',m!=='two');
+  document.getElementById('cm').classList.toggle('hidden',m!=='call');
+  document.querySelector('.adv').classList.toggle('hidden',m==='call');
 }
 
 // ===== toast =====
@@ -441,7 +464,7 @@ var UI={
     twA:'Language 1',twB:'Language 2',twNote:'Speak either of the two languages — the translation always goes to the other one.',
     echo:'Also repeat speech that is already in the target language',trH:'Transcript',trClear:'Clear',trEmpty:'The transcript appears as soon as you start speaking.',
     tagIn:'Recognized',tagOut:'Translation',stReady:'Ready',stConnecting:'Connecting…',stListening:'Listening — speak now',stError:'Error',stStopping:'Stopping…',
-    sameLang:'Pick two different languages.',connFail:'Connection failed:',micFail:'Microphone unavailable:'},
+    sameLang:'Pick two different languages.',connFail:'Connection failed:',micFail:'Microphone unavailable:',modeCall:'Call translation',cmLbl:'Hear and read the translation in',cmNote:'The source language is detected automatically.',cmInfo:'After you start, share the window/screen with your call (Teams) and tick "Share audio". Use headphones so only the other party is captured. On macOS only browser-tab audio is available (Teams on the web).',shareCancel:'Audio sharing was cancelled.',noAudio:'No audio captured — tick "Share audio" when sharing.',callListening:'Listening to the call — translating'},
   cs:{back:'Zpět na Marketplace',navSub:'Živý překladač',wlH:'Živý překladač řeči',wlSub:'Mluvte přirozeně a slyšte překlad během okamžiku. Řeč na řeč, 70+ jazyků, s živým přepisem.',
     c1h:'Jednosměrný režim',c1p:'Vyberte cílový jazyk, zapněte mikrofon a mluvte. Okamžitě slyšíte překlad a vidíte přepis.',
     c2h:'Obousměrná konverzace',c2p:'Dva jazyky, automatický překlad oběma směry — ideální pro rozhovor se zahraničním zákazníkem.',
@@ -451,7 +474,7 @@ var UI={
     twA:'Jazyk 1',twB:'Jazyk 2',twNote:'Mluvte libovolným z těchto dvou jazyků — překlad jde vždy do toho druhého.',
     echo:'Opakovat i řeč, která už je v cílovém jazyce',trH:'Přepis',trClear:'Vymazat',trEmpty:'Přepis se objeví, jakmile začnete mluvit.',
     tagIn:'Rozpoznáno',tagOut:'Překlad',stReady:'Připraveno',stConnecting:'Připojuji…',stListening:'Poslouchám — mluvte',stError:'Chyba',stStopping:'Zastavuji…',
-    sameLang:'Vyberte dva různé jazyky.',connFail:'Připojení selhalo:',micFail:'Mikrofon není dostupný:'},
+    sameLang:'Vyberte dva různé jazyky.',connFail:'Připojení selhalo:',micFail:'Mikrofon není dostupný:',modeCall:'Překlad hovoru',cmLbl:'Slyšet a číst překlad v jazyce',cmNote:'Zdrojový jazyk se rozpozná automaticky.',cmInfo:'Po startu sdílejte okno/obrazovku s hovorem (Teams) a zaškrtněte „Sdílet zvuk". Použijte sluchátka, ať se zachytí jen protistrana. Na macOS je dostupný jen zvuk z karty prohlížeče (Teams ve webu).',shareCancel:'Sdílení zvuku bylo zrušeno.',noAudio:'Nezachytil se žádný zvuk — při sdílení zaškrtněte „Sdílet zvuk".',callListening:'Poslouchám hovor — překládám'},
   sk:{back:'Späť na Marketplace',navSub:'Živý prekladač',wlH:'Živý prekladač reči',wlSub:'Hovorte prirodzene a počúvajte preklad v okamihu. Reč na reč, 70+ jazykov, so živým prepisom.',
     c1h:'Jednosmerný režim',c1p:'Vyberte cieľový jazyk, zapnite mikrofón a hovorte. Okamžite počujete preklad a vidíte prepis.',
     c2h:'Obojsmerná konverzácia',c2p:'Dva jazyky, automatický preklad oboma smermi — ideálne pre rozhovor so zahraničným zákazníkom.',
@@ -461,7 +484,7 @@ var UI={
     twA:'Jazyk 1',twB:'Jazyk 2',twNote:'Hovorte ktorýmkoľvek z týchto dvoch jazykov — preklad ide vždy do toho druhého.',
     echo:'Opakovať aj reč, ktorá už je v cieľovom jazyku',trH:'Prepis',trClear:'Vymazať',trEmpty:'Prepis sa objaví, hneď ako začnete hovoriť.',
     tagIn:'Rozpoznané',tagOut:'Preklad',stReady:'Pripravené',stConnecting:'Pripájam…',stListening:'Počúvam — hovorte',stError:'Chyba',stStopping:'Zastavujem…',
-    sameLang:'Vyberte dva rôzne jazyky.',connFail:'Pripojenie zlyhalo:',micFail:'Mikrofón nie je dostupný:'}
+    sameLang:'Vyberte dva rôzne jazyky.',connFail:'Pripojenie zlyhalo:',micFail:'Mikrofón nie je dostupný:',modeCall:'Preklad hovoru',cmLbl:'Počuť a čítať preklad v jazyku',cmNote:'Zdrojový jazyk sa rozpozná automaticky.',cmInfo:'Po štarte zdieľajte okno/obrazovku s hovorom (Teams) a zaškrtnite „Zdieľať zvuk". Použite slúchadlá, nech sa zachytí len druhá strana. Na macOS je dostupný len zvuk z karty prehliadača (Teams vo webe).',shareCancel:'Zdieľanie zvuku bolo zrušené.',noAudio:'Nezachytil sa žiadny zvuk — pri zdieľaní zaškrtnite „Zdieľať zvuk".',callListening:'Počúvam hovor — prekladám'}
 };
 function _set(id,v){ var e=document.getElementById(id); if(e)e.textContent=v; }
 function cgSetLang(l){
@@ -476,7 +499,7 @@ function setAppLang(l){
   cgSetLang(l);
   _set('mnav-back-text',t.back);_set('nav-sub',t.navSub);
   _set('wl-h',t.wlH);_set('wl-sub',t.wlSub);_set('wl-c1h',t.c1h);_set('wl-c1p',t.c1p);_set('wl-c2h',t.c2h);_set('wl-c2p',t.c2p);_set('wl-c3h',t.c3h);_set('wl-c3p',t.c3p);_set('wl-open',t.open);
-  _set('t-title',t.title);_set('t-lead',t.lead);_set('mode-one',t.modeOne);_set('mode-two',t.modeTwo);
+  _set('t-title',t.title);_set('t-lead',t.lead);_set('mode-one',t.modeOne);_set('mode-two',t.modeTwo);_set('mode-call',t.modeCall);_set('cm-lbl',t.cmLbl);_set('cm-note',t.cmNote);_set('cm-info',t.cmInfo);
   _set('ow-lbl',t.owLbl);_set('ow-note',t.owNote);_set('tw-a-lbl',t.twA);_set('tw-b-lbl',t.twB);_set('tw-note',t.twNote);
   _set('echo-lbl',t.echo);_set('tr-h',t.trH);_set('tr-clear',t.trClear);
   var emp=document.getElementById('tr-empty'); if(emp)emp.textContent=t.trEmpty;
@@ -497,8 +520,10 @@ function ltOpenApp(){ var w=document.getElementById('lt-welcome'); if(w)w.style.
 fillSelect('ow-tgt','en');
 fillSelect('tw-a','cs');
 fillSelect('tw-b','en');
+fillSelect('cm-tgt','cs');
 document.getElementById('mode-one').addEventListener('click',function(){setMode('one');});
 document.getElementById('mode-two').addEventListener('click',function(){setMode('two');});
+document.getElementById('mode-call').addEventListener('click',function(){setMode('call');});
 document.getElementById('micBtn').addEventListener('click',toggleMic);
 document.getElementById('tr-clear').addEventListener('click',clearTranscript);
 document.getElementById('swapBtn').addEventListener('click',function(){ var a=document.getElementById('tw-a'),b=document.getElementById('tw-b'); var t=a.value;a.value=b.value;b.value=t; });
