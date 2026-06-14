@@ -65,6 +65,9 @@
   .tr-head{display:flex;align-items:center;justify-content:space-between;margin:24px 0 10px}
   .tr-head h2{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--ink);margin:0;font-weight:700}
   .tr-clear{border:1px solid var(--line);background:#fff;color:var(--muted);font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px}
+  .tr-acts{display:flex;gap:8px;align-items:center}
+  .tr-mute{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+  .tr-mute.tr-mute-on{border-color:var(--err);color:var(--err);background:#fff5f3}
   .transcript{min-height:120px;max-height:340px;overflow-y:auto;background:var(--tint);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
   .tr-empty{color:var(--muted-2);font-size:13px;text-align:center;margin:auto}
   .bubble{max-width:88%;padding:9px 13px;border-radius:12px;font-size:14px;line-height:1.45}
@@ -275,7 +278,10 @@
 
     <div class="tr-head">
       <h2 id="tr-h">Přepis</h2>
-      <button class="tr-clear" id="tr-clear">Vymazat</button>
+      <div class="tr-acts">
+        <button class="tr-clear tr-mute" id="mute-btn" type="button" title="Zvuk překladu zap./vyp."><span id="mute-ico">🔊</span><span id="mute-lbl">Zvuk</span></button>
+        <button class="tr-clear" id="tr-clear">Vymazat</button>
+      </div>
     </div>
     <div class="transcript" id="transcript"><div class="tr-empty" id="tr-empty">Přepis se objeví, jakmile začnete mluvit.</div></div>
   </div>
@@ -355,7 +361,7 @@ function pcm16Base64(float32){
 // ===== přehrávání (24 kHz PCM16) =====
 function AudioPlayer(){ this.ctx=null; this.gain=null; this.nextTime=0; }
 AudioPlayer.prototype.unlock=function(){
-  if(!this.ctx){ this.ctx=new (window.AudioContext||window.webkitAudioContext)(); this.gain=this.ctx.createGain(); this.gain.gain.value=2.2; this.gain.connect(this.ctx.destination); }
+  if(!this.ctx){ this.ctx=new (window.AudioContext||window.webkitAudioContext)(); this.gain=this.ctx.createGain(); this.gain.gain.value=(window.__muted?0:2.2); this.gain.connect(this.ctx.destination); }
   if(this.ctx.state==='suspended'){ try{ this.ctx.resume(); }catch(e){} }
   this.nextTime=0;
 };
@@ -385,6 +391,14 @@ AudioPlayer.prototype.destroy=function(){ try{if(this.ctx)this.ctx.close();}catc
 // ===== jedna překladová session (token + WebSocket) =====
 function LiveSession(opts){ this.target=opts.target; this.echo=opts.echo; this.primary=opts.primary; this.ws=null; }
 var PLAYER=new AudioPlayer();
+function applyMute(){
+  var ico=document.getElementById('mute-ico'),lbl=document.getElementById('mute-lbl'),b=document.getElementById('mute-btn');
+  var t=window.__T||{};
+  if(window.__muted){ if(PLAYER&&PLAYER.gain){try{PLAYER.gain.gain.value=0;}catch(e){}} if(ico)ico.textContent='\uD83D\uDD07'; if(lbl)lbl.textContent=t.muted||'Ztlumeno'; if(b)b.classList.add('tr-mute-on'); }
+  else { if(PLAYER&&PLAYER.gain){try{PLAYER.gain.gain.value=2.2;}catch(e){}} if(ico)ico.textContent='\uD83D\uDD0A'; if(lbl)lbl.textContent=t.audio||'Zvuk'; if(b)b.classList.remove('tr-mute-on'); }
+}
+function toggleMute(){ window.__muted=!window.__muted; try{localStorage.setItem('lt_muted',window.__muted?'1':'0');}catch(e){} applyMute(); }
+window.applyMute=applyMute;
 LiveSession.prototype.connect=async function(){
   var r=await fetch('/api/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:this.target,echo:this.echo})});
   if(!r.ok){ var j=await r.json().catch(function(){return {};}); throw new Error((j.error&&j.error.message)||('HTTP '+r.status)); }
@@ -530,7 +544,7 @@ var UI={
     open:'Open application',title:'Live speech translator',lead:'Speak and hear the translation in real time. Speech to speech, 70+ languages.',
     modeOne:'One-way',modeTwo:'Two-way',owLbl:'Hear the translation in',owNote:'The source language is detected automatically.',
     twA:'Language 1',twB:'Language 2',twNote:'Speak either of the two languages — the translation always goes to the other one.',
-    echo:'Also repeat speech that is already in the target language',trH:'Transcript',trClear:'Clear',trEmpty:'The transcript appears as soon as you start speaking.',
+    echo:'Also repeat speech that is already in the target language',trH:'Transcript',trClear:'Clear',audio:'Sound',muted:'Muted',trEmpty:'The transcript appears as soon as you start speaking.',
     tagIn:'Recognized',tagOut:'Translation',stReady:'Ready',stConnecting:'Connecting…',stListening:'Listening — speak now',stError:'Error',stStopping:'Stopping…',
     sameLang:'Pick two different languages.',connFail:'Connection failed:',micFail:'Microphone unavailable:',modeCall:'Call translation',cmLbl:'Hear and read the translation in',cmNote:'The source language is detected automatically.',cmInfo:'After you start, share the window/screen with your call (Teams) and tick "Share audio". Use headphones so only the other party is captured. On macOS only browser-tab audio is available (Teams on the web).',shareCancel:'Audio sharing was cancelled.',noAudio:'No audio captured — tick "Share audio" when sharing.',callListening:'Listening to the call — translating'},
   cs:{back:'Zpět na Marketplace',navSub:'Živý překladač',wlH:'Živý překladač řeči',wlSub:'Mluvte přirozeně a slyšte překlad během okamžiku. Řeč na řeč, 70+ jazyků, s živým přepisem.',
@@ -544,7 +558,7 @@ var UI={
     open:'Otevřít aplikaci',title:'Živý překladač řeči',lead:'Mluvte a slyšte překlad v reálném čase. Řeč na řeč, 70+ jazyků.',
     modeOne:'Jednosměrný',modeTwo:'Obousměrný',owLbl:'Slyšet překlad v jazyce',owNote:'Zdrojový jazyk se rozpozná automaticky.',
     twA:'Jazyk 1',twB:'Jazyk 2',twNote:'Mluvte libovolným z těchto dvou jazyků — překlad jde vždy do toho druhého.',
-    echo:'Opakovat i řeč, která už je v cílovém jazyce',trH:'Přepis',trClear:'Vymazat',trEmpty:'Přepis se objeví, jakmile začnete mluvit.',
+    echo:'Opakovat i řeč, která už je v cílovém jazyce',trH:'Přepis',trClear:'Vymazat',audio:'Zvuk',muted:'Ztlumeno',trEmpty:'Přepis se objeví, jakmile začnete mluvit.',
     tagIn:'Rozpoznáno',tagOut:'Překlad',stReady:'Připraveno',stConnecting:'Připojuji…',stListening:'Poslouchám — mluvte',stError:'Chyba',stStopping:'Zastavuji…',
     sameLang:'Vyberte dva různé jazyky.',connFail:'Připojení selhalo:',micFail:'Mikrofon není dostupný:',modeCall:'Překlad hovoru',cmLbl:'Slyšet a číst překlad v jazyce',cmNote:'Zdrojový jazyk se rozpozná automaticky.',cmInfo:'Po startu sdílejte okno/obrazovku s hovorem (Teams) a zaškrtněte „Sdílet zvuk". Použijte sluchátka, ať se zachytí jen protistrana. Na macOS je dostupný jen zvuk z karty prohlížeče (Teams ve webu).',shareCancel:'Sdílení zvuku bylo zrušeno.',noAudio:'Nezachytil se žádný zvuk — při sdílení zaškrtněte „Sdílet zvuk".',callListening:'Poslouchám hovor — překládám'},
   sk:{back:'Späť na Marketplace',navSub:'Živý prekladač',wlH:'Živý prekladač reči',wlSub:'Hovorte prirodzene a počúvajte preklad v okamihu. Reč na reč, 70+ jazykov, so živým prepisom.',
@@ -558,7 +572,7 @@ var UI={
     open:'Otvoriť aplikáciu',title:'Živý prekladač reči',lead:'Hovorte a počúvajte preklad v reálnom čase. Reč na reč, 70+ jazykov.',
     modeOne:'Jednosmerný',modeTwo:'Obojsmerný',owLbl:'Počuť preklad v jazyku',owNote:'Zdrojový jazyk sa rozpozná automaticky.',
     twA:'Jazyk 1',twB:'Jazyk 2',twNote:'Hovorte ktorýmkoľvek z týchto dvoch jazykov — preklad ide vždy do toho druhého.',
-    echo:'Opakovať aj reč, ktorá už je v cieľovom jazyku',trH:'Prepis',trClear:'Vymazať',trEmpty:'Prepis sa objaví, hneď ako začnete hovoriť.',
+    echo:'Opakovať aj reč, ktorá už je v cieľovom jazyku',trH:'Prepis',trClear:'Vymazať',audio:'Zvuk',muted:'Stlmené',trEmpty:'Prepis sa objaví, hneď ako začnete hovoriť.',
     tagIn:'Rozpoznané',tagOut:'Preklad',stReady:'Pripravené',stConnecting:'Pripájam…',stListening:'Počúvam — hovorte',stError:'Chyba',stStopping:'Zastavujem…',
     sameLang:'Vyberte dva rôzne jazyky.',connFail:'Pripojenie zlyhalo:',micFail:'Mikrofón nie je dostupný:',modeCall:'Preklad hovoru',cmLbl:'Počuť a čítať preklad v jazyku',cmNote:'Zdrojový jazyk sa rozpozná automaticky.',cmInfo:'Po štarte zdieľajte okno/obrazovku s hovorom (Teams) a zaškrtnite „Zdieľať zvuk". Použite slúchadlá, nech sa zachytí len druhá strana. Na macOS je dostupný len zvuk z karty prehliadača (Teams vo webe).',shareCancel:'Zdieľanie zvuku bolo zrušené.',noAudio:'Nezachytil sa žiadny zvuk — pri zdieľaní zaškrtnite „Zdieľať zvuk".',callListening:'Počúvam hovor — prekladám'}
 };
@@ -581,7 +595,7 @@ function setAppLang(l){
   var ul=document.getElementById('wl-tips');if(ul){ul.innerHTML='';for(var ti=0;ti<t.tips.length;ti++){var liT=document.createElement('li');liT.textContent=t.tips[ti];ul.appendChild(liT);}}
   _set('t-title',t.title);_set('t-lead',t.lead);_set('mode-one',t.modeOne);_set('mode-two',t.modeTwo);_set('mode-call',t.modeCall);_set('cm-lbl',t.cmLbl);_set('cm-note',t.cmNote);_set('cm-info',t.cmInfo);
   _set('ow-lbl',t.owLbl);_set('ow-note',t.owNote);_set('tw-a-lbl',t.twA);_set('tw-b-lbl',t.twB);_set('tw-note',t.twNote);
-  _set('echo-lbl',t.echo);_set('tr-h',t.trH);_set('tr-clear',t.trClear);
+  _set('echo-lbl',t.echo);_set('tr-h',t.trH);_set('tr-clear',t.trClear);if(window.applyMute)applyMute();
   var emp=document.getElementById('tr-empty'); if(emp)emp.textContent=t.trEmpty;
   if(!running) setStatus('idle');
   document.documentElement.lang=l;
@@ -606,11 +620,14 @@ document.getElementById('mode-two').addEventListener('click',function(){setMode(
 document.getElementById('mode-call').addEventListener('click',function(){setMode('call');});
 document.getElementById('micBtn').addEventListener('click',toggleMic);
 document.getElementById('tr-clear').addEventListener('click',clearTranscript);
+document.getElementById('mute-btn').addEventListener('click',toggleMute);
 document.getElementById('swapBtn').addEventListener('click',function(){ var a=document.getElementById('tw-a'),b=document.getElementById('tw-b'); var t=a.value;a.value=b.value;b.value=t; });
 window.addEventListener('beforeunload',function(){ if(running)cleanup(); });
 (function(){
   var saved='cs'; try{ saved=localStorage.getItem('lt_lang')||'cs'; }catch(e){}
+  try{ window.__muted=localStorage.getItem('lt_muted')==='1'; }catch(e){}
   setAppLang(saved);
+  if(window.applyMute)applyMute();
   try{ if(sessionStorage.getItem('lt_gate_ok')==='1') document.getElementById('cg-gate').style.display='none'; }catch(e){}
 })();
 </script>
