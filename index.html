@@ -306,13 +306,19 @@ function pcm16Base64(float32){
 }
 
 // ===== přehrávání (24 kHz PCM16) =====
-function AudioPlayer(){ this.ctx=null; this.node=null; this.ready=false; }
+function AudioPlayer(){ this.ctx=null; this.node=null; this.gain=null; this.ready=false; this.modulePromise=null; }
+AudioPlayer.prototype.unlock=function(){
+  if(!this.ctx){ this.ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:24000}); }
+  if(this.ctx.state==='suspended'){ try{ this.ctx.resume(); }catch(e){} }
+  if(!this.modulePromise){ this.modulePromise=this.ctx.audioWorklet.addModule(playbackWorkletUrl); }
+};
 AudioPlayer.prototype.init=async function(){
   if(this.ready)return;
-  this.ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:24000});
-  await this.ctx.audioWorklet.addModule(playbackWorkletUrl);
+  if(!this.ctx) this.unlock();
+  await this.modulePromise;
   this.node=new AudioWorkletNode(this.ctx,'pcm-processor');
-  this.node.connect(this.ctx.destination);
+  this.gain=this.ctx.createGain(); this.gain.gain.value=2.2;
+  this.node.connect(this.gain); this.gain.connect(this.ctx.destination);
   this.ready=true;
 };
 AudioPlayer.prototype.play=async function(b64){
@@ -332,7 +338,8 @@ AudioPlayer.prototype.interrupt=function(){ if(this.node)this.node.port.postMess
 AudioPlayer.prototype.destroy=function(){ try{if(this.ctx)this.ctx.close();}catch(e){} this.ready=false; };
 
 // ===== jedna překladová session (token + WebSocket) =====
-function LiveSession(opts){ this.target=opts.target; this.echo=opts.echo; this.primary=opts.primary; this.ws=null; this.player=new AudioPlayer(); }
+function LiveSession(opts){ this.target=opts.target; this.echo=opts.echo; this.primary=opts.primary; this.ws=null; }
+var PLAYER=new AudioPlayer();
 LiveSession.prototype.connect=async function(){
   var r=await fetch('/api/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:this.target,echo:this.echo})});
   if(!r.ok){ var j=await r.json().catch(function(){return {};}); throw new Error((j.error&&j.error.message)||('HTTP '+r.status)); }
@@ -355,11 +362,11 @@ LiveSession.prototype.handle=function(d){
   if(sc.inputTranscription && this.primary) pushTranscript('in', sc.inputTranscription.text||'', sc.inputTranscription.languageCode||'', sc.inputTranscription.finished);
   if(sc.outputTranscription) pushTranscript('out', sc.outputTranscription.text||'', sc.outputTranscription.languageCode||this.target, sc.outputTranscription.finished);
   var parts=sc.modelTurn&&sc.modelTurn.parts;
-  if(parts) for(var i=0;i<parts.length;i++){ if(parts[i].inlineData&&parts[i].inlineData.data){ window.__audioRecv=(window.__audioRecv||0)+1; this.player.play(parts[i].inlineData.data); if(window.__updAudioDiag)window.__updAudioDiag(); } }
+  if(parts) for(var i=0;i<parts.length;i++){ if(parts[i].inlineData&&parts[i].inlineData.data){ window.__audioRecv=(window.__audioRecv||0)+1; PLAYER.play(parts[i].inlineData.data); if(window.__updAudioDiag)window.__updAudioDiag(); } }
   // pri prubeznem prekladu frontu nemazeme, at se prelozeny zvuk stihne prehrat
 };
 LiveSession.prototype.sendAudio=function(b64){ if(this.ws&&this.ws.readyState===1) this.ws.send(JSON.stringify({realtimeInput:{audio:{data:b64,mimeType:'audio/pcm;rate=16000'}}})); };
-LiveSession.prototype.close=function(){ try{if(this.ws)this.ws.close();}catch(e){} this.player.destroy(); };
+LiveSession.prototype.close=function(){ try{if(this.ws)this.ws.close();}catch(e){} };
 
 // ===== přepis =====
 var curBubble={in:null,out:null};
@@ -396,7 +403,7 @@ function setStatus(state){
 }
 function updateMic(){ var b=document.getElementById('micBtn'); b.classList.toggle('live',running); var l=document.getElementById('lvl'); if(l){ l.style.display=running?'block':'none'; if(!running){ var bar=document.getElementById('lvl-bar'); if(bar)bar.style.width='0'; } } var ad=document.getElementById('audiodiag'); if(ad){ ad.style.display=running?'block':'none'; if(!running)ad.textContent=''; } }
 window.__onLevel=function(p){ var bar=document.getElementById('lvl-bar'); if(bar)bar.style.width=Math.min(100,Math.round(p*220))+'%'; };
-window.__updAudioDiag=function(){ var d=document.getElementById('audiodiag'); if(d){ var r=window.__audioRecv||0,p=window.__audioPlayed||0; d.textContent='\uD83D\uDD0A audio '+p+'/'+r+(window.__audioErr?(' \u00b7 chyba: '+window.__audioErr):''); } };
+window.__updAudioDiag=function(){ var d=document.getElementById('audiodiag'); if(d){ var r=window.__audioRecv||0,p=window.__audioPlayed||0; var st=(window.PLAYER&&window.PLAYER.ctx)?window.PLAYER.ctx.state:'-'; d.textContent='audio '+p+'/'+r+' \u00b7 '+st+(window.__audioErr?(' \u00b7 chyba: '+window.__audioErr):''); } };
 async function startTranslate(){
   if(running||busy)return; busy=true; window.__audioRecv=0; window.__audioPlayed=0; window.__audioErr='';
   var echo=document.getElementById('echo').checked;
@@ -441,7 +448,7 @@ function cleanup(){
   for(var i=0;i<sessions.length;i++) sessions[i].close();
   sessions=[];
 }
-function toggleMic(){ if(running) stopTranslate(); else startTranslate(); }
+function toggleMic(){ if(running){ stopTranslate(); } else { try{ PLAYER.unlock(); }catch(e){} startTranslate(); } }
 
 // ===== UI eventy =====
 function setMode(m){
