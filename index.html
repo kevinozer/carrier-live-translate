@@ -222,6 +222,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
       </button>
       <div class="status s-idle" id="status"><span class="dot"></span><span id="status-text">Připraveno</span></div>
+      <div id="lvl" style="display:none;width:160px;height:7px;background:var(--line);border-radius:5px;overflow:hidden"><div id="lvl-bar" style="height:100%;width:0;background:var(--ok);transition:width .08s"></div></div>
     </div>
 
     <div class="tr-head">
@@ -278,10 +279,14 @@ AudioCapture.prototype.start=async function(providedStream){
   this.stream=providedStream||await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
   this.ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});
   await this.ctx.audioWorklet.addModule(captureWorkletUrl);
+  if(this.ctx.state==='suspended'){ try{ await this.ctx.resume(); }catch(e){} }
   this.node=new AudioWorkletNode(this.ctx,'audio-capture-processor');
   var self=this;
-  this.node.port.onmessage=function(e){ if(!self.on)return; self.onChunk(pcm16Base64(e.data)); };
-  this.ctx.createMediaStreamSource(this.stream).connect(this.node);
+  this.node.port.onmessage=function(e){ if(!self.on)return; var f=e.data; var peak=0; for(var k=0;k<f.length;k++){ var a=f[k]<0?-f[k]:f[k]; if(a>peak)peak=a; } if(window.__onLevel)window.__onLevel(peak); self.onChunk(pcm16Base64(f)); };
+  var src=this.ctx.createMediaStreamSource(this.stream);
+  src.connect(this.node);
+  this.sink=this.ctx.createGain(); this.sink.gain.value=0;
+  this.node.connect(this.sink); this.sink.connect(this.ctx.destination);
   this.on=true;
 };
 AudioCapture.prototype.stop=function(){
@@ -384,7 +389,8 @@ function setStatus(state){
   var T=window.__T||{};
   tx.textContent=({idle:T.stReady,connecting:T.stConnecting,listening:(mode==='call'?(T.callListening||T.stListening):T.stListening),error:T.stError,stopping:T.stStopping})[state]||state;
 }
-function updateMic(){ var b=document.getElementById('micBtn'); b.classList.toggle('live',running); }
+function updateMic(){ var b=document.getElementById('micBtn'); b.classList.toggle('live',running); var l=document.getElementById('lvl'); if(l){ l.style.display=running?'block':'none'; if(!running){ var bar=document.getElementById('lvl-bar'); if(bar)bar.style.width='0'; } } }
+window.__onLevel=function(p){ var bar=document.getElementById('lvl-bar'); if(bar)bar.style.width=Math.min(100,Math.round(p*220))+'%'; };
 async function startTranslate(){
   if(running||busy)return; busy=true;
   var echo=document.getElementById('echo').checked;
