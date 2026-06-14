@@ -306,36 +306,32 @@ function pcm16Base64(float32){
 }
 
 // ===== přehrávání (24 kHz PCM16) =====
-function AudioPlayer(){ this.ctx=null; this.node=null; this.gain=null; this.ready=false; this.modulePromise=null; }
+function AudioPlayer(){ this.ctx=null; this.gain=null; this.nextTime=0; }
 AudioPlayer.prototype.unlock=function(){
-  if(!this.ctx){ this.ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:24000}); }
+  if(!this.ctx){ this.ctx=new (window.AudioContext||window.webkitAudioContext)(); this.gain=this.ctx.createGain(); this.gain.gain.value=2.2; this.gain.connect(this.ctx.destination); }
   if(this.ctx.state==='suspended'){ try{ this.ctx.resume(); }catch(e){} }
-  if(!this.modulePromise){ this.modulePromise=this.ctx.audioWorklet.addModule(playbackWorkletUrl); }
-};
-AudioPlayer.prototype.init=async function(){
-  if(this.ready)return;
-  if(!this.ctx) this.unlock();
-  await this.modulePromise;
-  this.node=new AudioWorkletNode(this.ctx,'pcm-processor');
-  this.gain=this.ctx.createGain(); this.gain.gain.value=2.2;
-  this.node.connect(this.gain); this.gain.connect(this.ctx.destination);
-  this.ready=true;
+  this.nextTime=0;
 };
 AudioPlayer.prototype.play=async function(b64){
   try{
-    if(!this.ready)await this.init();
-    if(this.ctx.state==='suspended')await this.ctx.resume();
+    if(!this.ctx) this.unlock();
+    if(this.ctx.state==='suspended') await this.ctx.resume();
     var bin=atob(b64), n=bin.length; n-=(n%2);
+    if(n<=0) return;
     var bytes=new Uint8Array(n);
     for(var k=0;k<n;k++) bytes[k]=bin.charCodeAt(k);
-    var i16=new Int16Array(bytes.buffer), f=new Float32Array(i16.length);
-    for(var j=0;j<i16.length;j++) f[j]=i16[j]/32768;
-    this.node.port.postMessage(f);
+    var i16=new Int16Array(bytes.buffer), len=i16.length;
+    var buf=this.ctx.createBuffer(1, len, 24000);
+    var ch=buf.getChannelData(0);
+    for(var j=0;j<len;j++) ch[j]=i16[j]/32768;
+    var srcNode=this.ctx.createBufferSource(); srcNode.buffer=buf; srcNode.connect(this.gain);
+    var startAt=Math.max(this.ctx.currentTime+0.03, this.nextTime);
+    srcNode.start(startAt); this.nextTime=startAt+buf.duration;
     window.__audioPlayed=(window.__audioPlayed||0)+1; if(window.__updAudioDiag)window.__updAudioDiag();
   }catch(e){ window.__audioErr=e.message; console.error('play error',e); if(window.__updAudioDiag)window.__updAudioDiag(); }
 };
-AudioPlayer.prototype.interrupt=function(){ if(this.node)this.node.port.postMessage('interrupt'); };
-AudioPlayer.prototype.destroy=function(){ try{if(this.ctx)this.ctx.close();}catch(e){} this.ready=false; };
+AudioPlayer.prototype.interrupt=function(){ this.nextTime=0; };
+AudioPlayer.prototype.destroy=function(){ try{if(this.ctx)this.ctx.close();}catch(e){} this.ctx=null; this.nextTime=0; };
 
 // ===== jedna překladová session (token + WebSocket) =====
 function LiveSession(opts){ this.target=opts.target; this.echo=opts.echo; this.primary=opts.primary; this.ws=null; }
